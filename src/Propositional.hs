@@ -12,9 +12,9 @@ module Propositional ( Var
                      , threadIn
                      , unitJustification
                      , arbitraryLiteral
-                     , getLearnedClauses
+                     , getLearnedClause
                      , clauseSize
-                     , readFormula
+                     , doesSatisfy
                      ) where
 
 import qualified Data.Set as S
@@ -91,10 +91,9 @@ currentFormula fs = case fs of
     Initial f -> f
     Derived _ f _ _ -> f
 
-getLearnedClauses :: FormulaState -> [Clause]
-getLearnedClauses fs = map (flip go fs) cs where
-    ls = filter isUnsatClause $ currentFormula fs
-    cs = map refreshClause ls
+getLearnedClause :: FormulaState -> Clause
+getLearnedClause fs = go c fs where
+    c = refreshClause $ head $ filter isUnsatClause $ currentFormula fs
     go c fs = case fs of
         Initial _ -> c
         Derived _ _ Nothing fs' -> go c fs'
@@ -122,15 +121,8 @@ arbitraryLiteral (Clause now init) = S.findMin now
 clauseSize :: Clause -> Int
 clauseSize (Clause c _) = length c
 
-readFormula :: IO Formula
-readFormula = do
-    x <- getLine
-    let xs = words x
-    case head xs of
-        "c" -> readFormula
-        "p" -> do
-            let nr = (read $ last xs) :: Int
-            sequence $ take nr $ repeat $ do
-                x <- getLine
-                let xs = (map read $ init $ words x) :: [Int]
-                return $ fromLiterals xs
+doesSatisfy :: [Lit] -> Formula -> Bool
+doesSatisfy ls fs = isGood && all sat fs where
+    s = S.fromList ls
+    isGood = all (\l -> not $ (-l) `S.member` s) ls
+    sat (Clause c _) = any (\l -> l `S.member` s) c

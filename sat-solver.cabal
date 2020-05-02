@@ -58,10 +58,8 @@ executable sat-solver
 
   -- Other library packages from which modules are imported.
   build-depends:       base >=4.11 && <4.12,
-                       containers >=0.6.2.1 ,
-                       extra >=1.1,
-                       monad-loops >=0.4.3,
-                       mtl >=2.2.2
+                       containers >=0.6.2.1,
+                       cond >=0.4.1.1
 
   extensions: TypeSynonymInstances, FlexibleContexts
 
