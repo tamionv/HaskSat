@@ -13,18 +13,22 @@ module Propositional ( Var
                      , unitJustification
                      , arbitraryLiteral
                      , getLearnedClause
-                     , clauseSize
                      , doesSatisfy
+                     , getLiterals
                      ) where
 
 import qualified Data.Set as S
 import Data.Maybe
+import Data.List
+import Data.Ord
 
 type Var = Int
 
 type Lit = Int
 
-data Clause = Clause (S.Set Lit) [Lit] deriving (Show, Eq, Ord)
+data Clause = Clause { initial :: [Lit]
+                     , current :: S.Set Lit
+                     } deriving (Show, Eq, Ord)
 
 type Formula = [Clause]
 
@@ -36,46 +40,43 @@ getChoiceResult :: Lit -> Maybe [Lit] -> FormulaState -> FormulaState
 getChoiceResult l r fs = Derived l (setInFormula l (currentFormula fs)) r fs
 
 fromLiterals :: [Lit] -> Clause
-fromLiterals ls = Clause (S.fromList ls) ls
+fromLiterals ls = Clause { initial = ls
+                         , current = S.fromList ls
+                         }
 
 refreshClause :: Clause -> Clause
-refreshClause (Clause _ ls) = fromLiterals ls
+refreshClause = fromLiterals . initial
 
 addLiteral :: Lit -> Clause -> Clause
-addLiteral l cl@(Clause c cs)
-    | (-l) `inClause` cl = fromLiterals []
-    | otherwise = Clause (S.insert l c) (l:cs)
+addLiteral l c
+    | (-l) `inClause` c = fromLiterals []
+    | otherwise = Clause { initial = l:initial c
+                         , current = S.insert l $ current c
+                         }
 
 inClause :: Lit -> Clause -> Bool
-inClause l (Clause c _) = l `S.member` c
+inClause l c = l `S.member` current c
 
 removeLiteral :: Lit -> Clause -> Clause
-removeLiteral l (Clause x y) = Clause (S.delete l x) y
+removeLiteral l c = c { current = S.delete l $ current c }
 
 isUnitClause :: Clause -> Bool
-isUnitClause (Clause x _) = S.size x == 1
-
-isUnitFormula :: Formula -> Bool
-isUnitFormula = any isUnitClause
+isUnitClause c = S.size (current c) == 1
 
 isUnitState :: FormulaState -> Bool
-isUnitState = isUnitFormula . currentFormula
+isUnitState = any isUnsatClause . currentFormula
 
 isUnsatClause :: Clause -> Bool
-isUnsatClause (Clause x _) = S.null x
-
-isUnsatFormula :: Formula -> Bool
-isUnsatFormula = any isUnsatClause
+isUnsatClause c = S.null $ current c
 
 isUnsatState :: FormulaState -> Bool
-isUnsatState = isUnsatFormula . currentFormula
+isUnsatState = any isUnsatClause . currentFormula
 
 getUnitClause :: Formula -> (Clause, Formula)
 getUnitClause = go isUnitClause where
     go f (x:xs)
         | f x = (x, xs)
         | otherwise = let (r, xs') = go f xs in (r, x:xs')
-
 
 setInClause :: Lit -> Clause -> Maybe Clause
 setInClause l c
@@ -112,17 +113,19 @@ threadIn c fs = fst $ inner c fs where
             Just x -> x:f
 
 unitJustification :: Clause -> (Lit, [Lit])
-unitJustification (Clause now init) = (lit, filter (/=lit) init) where
-    lit = S.findMin now
+unitJustification c = (lit, filter (/=lit) $ initial c) where
+    lit = S.findMin $ current c
 
-arbitraryLiteral :: Clause -> Lit
-arbitraryLiteral (Clause now init) = S.findMin now
-
-clauseSize :: Clause -> Int
-clauseSize (Clause c _) = length c
+arbitraryLiteral :: FormulaState -> Lit
+arbitraryLiteral = S.findMin . current . minimumBy (comparing $ length . current) . currentFormula where
 
 doesSatisfy :: [Lit] -> Formula -> Bool
 doesSatisfy ls fs = isGood && all sat fs where
     s = S.fromList ls
     isGood = all (\l -> not $ (-l) `S.member` s) ls
-    sat (Clause c _) = any (\l -> l `S.member` s) c
+    sat c = any (\l -> l `S.member` s) $ current c
+
+getLiterals :: FormulaState -> [Lit]
+getLiterals fs = case fs of
+    Initial _ -> []
+    Derived l _ _ fs' -> l:getLiterals fs'

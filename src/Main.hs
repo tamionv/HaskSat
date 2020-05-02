@@ -1,10 +1,8 @@
 module Main where
 
 import Control.Monad
-import Control.Conditional (condM, otherwiseM)
+import Control.Conditional (cond)
 import Debug.Trace
-import Data.List
-import Data.Ord
 import Propositional
 
 newtype CDCL a = CDCL (FormulaState -> Either (a, FormulaState) Clause)
@@ -17,6 +15,9 @@ evalCDCL c fs = case runCDCL c fs of Left (a, _) -> a
 
 liftStateFunc :: (FormulaState -> a) -> CDCL a
 liftStateFunc f = CDCL $ \fs -> Left (f fs, fs)
+
+getState :: CDCL FormulaState
+getState = liftStateFunc id
 
 instance Monad CDCL where
     return x = CDCL $ \fs -> Left (x, fs)
@@ -40,49 +41,31 @@ xm `orElse` ym = CDCL $ \fs -> case runCDCL xm fs of
     Left a -> Left a
     Right c -> runCDCL ym $ threadIn c fs
 
-isFinished :: CDCL Bool
-isFinished = liftStateFunc (null . currentFormula)
-
-isUnit :: CDCL Bool
-isUnit = liftStateFunc isUnitState
-
-isUnsat :: CDCL Bool
-isUnsat = liftStateFunc isUnsatState
-
-doUnitProp :: CDCL ()
-doUnitProp = liftStateFunc currentFormula >>= go where
-    go fs = choose lit $ Just r where
-        (c, fs') = getUnitClause fs
-        (lit, r) = unitJustification c
-
 failAndLearn :: CDCL ()
 failAndLearn = CDCL $ \fs -> Right $ getLearnedClause fs
 
-getLiterals :: CDCL [Lit]
-getLiterals = liftStateFunc go where
-    go fs = case fs of
-        Initial _ -> []
-        Derived l _ _ fs' -> l:go fs'
-
-getInitialFormula :: CDCL Formula
-getInitialFormula = liftStateFunc go where
-    go fs = case fs of
-        Initial f -> f
-        Derived _ _ _ fs' -> go fs
-
 theAlgorithm :: CDCL [Lit]
-theAlgorithm = do go ; getLiterals where
-    go = condM [ (isFinished, return ())
-               , (isUnsat   , failAndLearn)
-               , (isUnit    , do doUnitProp ; go)
-               , (otherwiseM, doMainAttempt)
-               ]
-    choiceFor lit = do choose lit Nothing ; go
-    doMainAttempt = do
-        x <- getLiterals
-        trace (show $ length x) $ return ()
-        lit <- liftStateFunc $ arbitraryLiteral . minimumBy (comparing clauseSize) . currentFormula
+theAlgorithm = do go ; liftStateFunc getLiterals where
+    go = do
+        fs <- getState
+        let cf = currentFormula fs
+        cond [ (null cf         , return ())
+             , (isUnsatState fs , failAndLearn)
+             , (isUnitState fs  , unitProp)
+             , (otherwise       , tryLiteral)
+             ]
+
+    unitProp = do
+        cf <- currentFormula <$> getState
+        let (c, _) = getUnitClause cf
+        let (lit, r) = unitJustification c
+        choose lit $ Just r
+
+    tryLiteral = do
+        lit <- liftStateFunc arbitraryLiteral
         choiceFor lit `orElse` choiceFor (-lit) 
+
+    choiceFor lit = do choose lit Nothing ; go
 
 readInput :: IO (Int, Int, Formula)
 readInput = do
