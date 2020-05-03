@@ -1,33 +1,9 @@
 module Main where
 
 import Control.Monad
-import Control.Conditional (cond)
 import Control.Exception
 import Propositional
-import FormulaState
-import CDCL
-
-theAlgorithm :: CDCL [Lit]
-theAlgorithm = do go ; gets choices where
-    go = do
-        fs <- gets id
-        cond [ (satState fs  , return ())
-             , (unsatState fs, failAndLearn)
-             , (unitState fs , unitProp)
-             , (otherwise    , tryLiteral)
-             ]
-
-    unitProp = modify unitPropagation
-
-    failAndLearn = do
-        c <- gets learnedClause
-        failWithClause c
-
-    tryLiteral = do
-        lit <- gets aFormulaStateLit
-        choose lit `orElse` choose (-lit) 
-
-    choose lit = do modify $ derivedState lit Nothing ; go
+import Algorithm
 
 readInput :: IO (Int, Int, Formula)
 readInput = do
@@ -45,11 +21,11 @@ readInput = do
 
 main = do
     (vars, clauses, f) <- readInput
-    let ret = runCDCL theAlgorithm (initialState f)
+    let ret = findSat f
     case ret of
-        Right (ls, _) -> do
+        Just ls -> do
             assert (satisfies ls f) $ return ()
             putStrLn $ "s cnf 1 " ++ show vars ++ " " ++ show clauses
             forM_ ls $ \l -> putStrLn $ "v " ++ show l
-        Left _ -> do
+        Nothing -> do
             putStrLn $ "s cnf 0 " ++ show vars ++ " " ++ show clauses
