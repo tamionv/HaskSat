@@ -17,17 +17,17 @@ theAlgorithm = do go ; gets choices where
              , (otherwise    , tryLiteral)
              ]
 
-    unitProp = modify applyUnitPropagation
+    unitProp = modify unitPropagation
 
     failAndLearn = do
-        c <- gets getLearnedClause
+        c <- gets learnedClause
         failWithClause c
 
     tryLiteral = do
-        lit <- gets arbitraryLiteral
+        lit <- gets aFormulaStateLit
         choose lit `orElse` choose (-lit) 
 
-    choose lit = do modify $ buildDerivedState lit Nothing ; go
+    choose lit = do modify $ derivedState lit Nothing ; go
 
 readInput :: IO (Int, Int, Formula)
 readInput = do
@@ -45,7 +45,7 @@ readInput = do
 
 main = do
     (vars, clauses, f) <- readInput
-    let ret = runCDCL theAlgorithm (Initial f)
+    let ret = runCDCL theAlgorithm (initialState f)
     case ret of
         Right (ls, _) -> do
             assert (satisfies ls f) $ return ()

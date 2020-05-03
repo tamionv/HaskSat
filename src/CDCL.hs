@@ -28,7 +28,7 @@ modify f = CDCL $ \fs -> Right ((), f fs)
 orElse :: CDCL a -> CDCL a -> CDCL a
 xm `orElse` ym = CDCL $ \fs -> case runCDCL xm fs of
     Right a -> Right a
-    Left c -> runCDCL ym $ threadClauseInState c fs
+    Left c -> runCDCL ym $ addClause c fs
 
 failWithClause :: Clause -> CDCL a
 failWithClause c = CDCL $ \_ -> Left c
