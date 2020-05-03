@@ -9,6 +9,7 @@ module CDCL ( CDCL(..)
 
 import Control.Monad
 import Propositional
+import FormulaState
 
 newtype CDCL a = CDCL (FormulaState -> Either Clause (a, FormulaState))
 

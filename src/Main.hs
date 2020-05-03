@@ -4,6 +4,7 @@ import Control.Monad
 import Control.Conditional (cond)
 import Control.Exception
 import Propositional
+import FormulaState
 import CDCL
 
 theAlgorithm :: CDCL [Lit]
