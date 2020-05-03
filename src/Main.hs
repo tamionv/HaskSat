@@ -2,6 +2,7 @@ module Main where
 
 import Control.Monad
 import Control.Conditional (cond)
+import Control.Exception
 import Propositional
 import CDCL
 
@@ -53,6 +54,7 @@ main = do
     let ret = runCDCL theAlgorithm (Initial f)
     case ret of
         Right (ls, _) -> do
+            assert (doesSatisfy ls f) $ return ()
             putStrLn $ "s cnf 1 " ++ show vars ++ " " ++ show clauses
             forM_ ls $ \l -> putStrLn $ "v " ++ show l
         Left _ -> do
