@@ -1,9 +1,8 @@
 module CDCL ( CDCL(..)
             , runCDCL
             , evalCDCL
-            , liftReader
+            , gets
             , modify
-            , getState
             , orElse
             , failWithClause
             ) where
@@ -19,19 +18,16 @@ runCDCL (CDCL f) = f
 evalCDCL :: CDCL a -> FormulaState -> a 
 evalCDCL c fs = case runCDCL c fs of Right (a, _) -> a
 
-liftReader :: (FormulaState -> a) -> CDCL a
-liftReader f = CDCL $ \fs -> Right (f fs, fs)
+gets :: (FormulaState -> a) -> CDCL a
+gets f = CDCL $ \fs -> Right (f fs, fs)
 
 modify :: (FormulaState -> FormulaState) -> CDCL ()
 modify f = CDCL $ \fs -> Right ((), f fs)
 
-getState :: CDCL FormulaState
-getState = liftReader id
-
 orElse :: CDCL a -> CDCL a -> CDCL a
 xm `orElse` ym = CDCL $ \fs -> case runCDCL xm fs of
     Right a -> Right a
-    Left c -> runCDCL ym $ threadIn c fs
+    Left c -> runCDCL ym $ threadClauseInState c fs
 
 failWithClause :: Clause -> CDCL a
 failWithClause c = CDCL $ \_ -> Left c

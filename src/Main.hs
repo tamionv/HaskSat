@@ -7,33 +7,26 @@ import Propositional
 import CDCL
 
 theAlgorithm :: CDCL [Lit]
-theAlgorithm = do go ; liftReader getLiterals where
+theAlgorithm = do go ; gets choices where
     go = do
-        fs <- getState
-        let cf = currentFormula fs
-        cond [ (null cf         , return ())
-             , (isUnsatState fs , failAndLearn)
-             , (isUnitState fs  , unitProp)
-             , (otherwise       , tryLiteral)
+        fs <- gets id
+        cond [ (satState fs  , return ())
+             , (unsatState fs, failAndLearn)
+             , (unitState fs , unitProp)
+             , (otherwise    , tryLiteral)
              ]
 
-    choose lit r = modify $ getChoiceResult lit r
-
-    unitProp = do
-        cf <- currentFormula <$> getState
-        let (c, _) = getUnitClause cf
-        let (lit, r) = unitJustification c
-        choose lit $ Just r
+    unitProp = modify applyUnitPropagation
 
     failAndLearn = do
-        c <- liftReader getLearnedClause
+        c <- gets getLearnedClause
         failWithClause c
 
     tryLiteral = do
-        lit <- liftReader arbitraryLiteral
-        choiceFor lit `orElse` choiceFor (-lit) 
+        lit <- gets arbitraryLiteral
+        choose lit `orElse` choose (-lit) 
 
-    choiceFor lit = do choose lit Nothing ; go
+    choose lit = do modify $ buildDerivedState lit Nothing ; go
 
 readInput :: IO (Int, Int, Formula)
 readInput = do
@@ -46,7 +39,7 @@ readInput = do
             a <- sequence $ take nr $ repeat $ do
                 x <- getLine
                 let xs = (map read $ init $ words x) :: [Int]
-                return $ fromLiterals xs
+                return $ buildClause xs
             return (vars, nr, a)
 
 main = do
@@ -54,7 +47,7 @@ main = do
     let ret = runCDCL theAlgorithm (Initial f)
     case ret of
         Right (ls, _) -> do
-            assert (doesSatisfy ls f) $ return ()
+            assert (satisfies ls f) $ return ()
             putStrLn $ "s cnf 1 " ++ show vars ++ " " ++ show clauses
             forM_ ls $ \l -> putStrLn $ "v " ++ show l
         Left _ -> do

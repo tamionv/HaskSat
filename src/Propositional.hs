@@ -3,18 +3,17 @@ module Propositional ( Var
                      , Clause(..)
                      , Formula
                      , FormulaState(..)
-                     , fromLiterals
-                     , isUnitState
-                     , isUnsatState
-                     , getUnitClause
-                     , getChoiceResult
-                     , currentFormula
-                     , threadIn
-                     , unitJustification
+                     , buildClause
+                     , unitState
+                     , unsatState
+                     , satState
+                     , buildDerivedState
+                     , threadClauseInState
+                     , applyUnitPropagation
                      , arbitraryLiteral
                      , getLearnedClause
-                     , doesSatisfy
-                     , getLiterals
+                     , satisfies
+                     , choices
                      ) where
 
 import qualified Data.Set as S
@@ -36,20 +35,20 @@ data FormulaState = Initial Formula
                   | Derived Lit Formula (Maybe [Lit]) FormulaState
                   deriving (Show, Eq, Ord)
 
-getChoiceResult :: Lit -> Maybe [Lit] -> FormulaState -> FormulaState
-getChoiceResult l r fs = Derived l (setInFormula l (currentFormula fs)) r fs
+buildDerivedState :: Lit -> Maybe [Lit] -> FormulaState -> FormulaState
+buildDerivedState l r fs = Derived l (setInFormula l (headForm fs)) r fs
 
-fromLiterals :: [Lit] -> Clause
-fromLiterals ls = Clause { initial = ls
+buildClause :: [Lit] -> Clause
+buildClause ls = Clause { initial = ls
                          , current = S.fromList ls
                          }
 
 refreshClause :: Clause -> Clause
-refreshClause = fromLiterals . initial
+refreshClause = buildClause . initial
 
 addLiteral :: Lit -> Clause -> Clause
 addLiteral l c
-    | (-l) `inClause` c = fromLiterals []
+    | (-l) `inClause` c = buildClause []
     | otherwise = Clause { initial = l:initial c
                          , current = S.insert l $ current c
                          }
@@ -60,23 +59,21 @@ inClause l c = l `S.member` current c
 removeLiteral :: Lit -> Clause -> Clause
 removeLiteral l c = c { current = S.delete l $ current c }
 
-isUnitClause :: Clause -> Bool
-isUnitClause c = S.size (current c) == 1
+unitState :: FormulaState -> Bool
+unitState = any ((==1) . S.size . current) . headForm
 
-isUnitState :: FormulaState -> Bool
-isUnitState = any isUnsatClause . currentFormula
+unsatState :: FormulaState -> Bool
+unsatState = any (S.null . current) . headForm
 
-isUnsatClause :: Clause -> Bool
-isUnsatClause c = S.null $ current c
+satState :: FormulaState -> Bool
+satState = null . headForm
 
-isUnsatState :: FormulaState -> Bool
-isUnsatState = any isUnsatClause . currentFormula
-
-getUnitClause :: Formula -> (Clause, Formula)
-getUnitClause = go isUnitClause where
-    go f (x:xs)
-        | f x = (x, xs)
-        | otherwise = let (r, xs') = go f xs in (r, x:xs')
+applyUnitPropagation :: FormulaState -> FormulaState
+applyUnitPropagation fs = fs' where
+    c = head $ filter ((==1) . S.size . current) $ headForm fs
+    lit = S.findMin $ current c
+    r = filter (/=lit) $ initial c
+    fs' = buildDerivedState lit (Just r) fs
 
 setInClause :: Lit -> Clause -> Maybe Clause
 setInClause l c
@@ -87,14 +84,14 @@ setInClause l c
 setInFormula :: Lit -> Formula -> Formula
 setInFormula l f = mapMaybe (setInClause l) f
 
-currentFormula :: FormulaState -> Formula
-currentFormula fs = case fs of
+headForm :: FormulaState -> Formula
+headForm fs = case fs of
     Initial f -> f
     Derived _ f _ _ -> f
 
 getLearnedClause :: FormulaState -> Clause
 getLearnedClause fs = go c fs where
-    c = refreshClause $ head $ filter isUnsatClause $ currentFormula fs
+    c = refreshClause $ head $ filter (S.null . current) $ headForm fs
     go c fs = case fs of
         Initial _ -> c
         Derived _ _ Nothing fs' -> go c fs'
@@ -102,8 +99,8 @@ getLearnedClause fs = go c fs where
             | (-l) `inClause` c -> go (foldr addLiteral (removeLiteral (-l) c) r) fs'
             | otherwise -> go c fs'
 
-threadIn :: Clause -> FormulaState -> FormulaState
-threadIn c fs = fst $ inner c fs where
+threadClauseInState :: Clause -> FormulaState -> FormulaState
+threadClauseInState c fs = fst $ inner c fs where
     inner c (Initial f) = (Initial (c:f), Just c)
     inner c (Derived l f r fs) = (Derived l f' r fs', c'') where
         (fs', c') = inner c fs
@@ -112,20 +109,16 @@ threadIn c fs = fst $ inner c fs where
             Nothing -> f
             Just x -> x:f
 
-unitJustification :: Clause -> (Lit, [Lit])
-unitJustification c = (lit, filter (/=lit) $ initial c) where
-    lit = S.findMin $ current c
-
 arbitraryLiteral :: FormulaState -> Lit
-arbitraryLiteral = S.findMin . current . minimumBy (comparing $ length . current) . currentFormula where
+arbitraryLiteral = S.findMin . current . minimumBy (comparing $ length . current) . headForm where
 
-doesSatisfy :: [Lit] -> Formula -> Bool
-doesSatisfy ls fs = isGood && all sat fs where
+satisfies :: [Lit] -> Formula -> Bool
+satisfies ls fs = isGood && all sat fs where
     s = S.fromList ls
     isGood = all (\l -> not $ (-l) `S.member` s) ls
     sat c = any (\l -> l `S.member` s) $ current c
 
-getLiterals :: FormulaState -> [Lit]
-getLiterals fs = case fs of
+choices :: FormulaState -> [Lit]
+choices fs = case fs of
     Initial _ -> []
-    Derived l _ _ fs' -> l:getLiterals fs'
+    Derived l _ _ fs' -> l:choices fs'
