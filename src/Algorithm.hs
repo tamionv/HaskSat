@@ -2,11 +2,12 @@ module Algorithm (findSat) where
 
 import Control.Monad
 import Control.Conditional (cond)
+import Control.Monad.State.Lazy
+import Control.Monad.Except
 import Propositional
 import FormulaState
-import CDCL
 
-algorithmAction :: CDCL [Lit]
+algorithmAction :: StateT FormulaState (Either Clause) [Lit]
 algorithmAction = do go ; gets choices where
     go = do
         fs <- gets id
@@ -20,15 +21,17 @@ algorithmAction = do go ; gets choices where
 
     failAndLearn = do
         c <- gets learnedClause
-        failWithClause c
+        throwError c
 
     tryLiteral = do
         lit <- gets aFormulaStateLit
-        choose lit `orElse` choose (-lit) 
+        choose lit `catchError` \c -> do
+            modify $ addClause c
+            choose (-lit) 
 
     choose lit = do modify $ derivedState lit Nothing ; go
 
 findSat :: Formula -> Maybe [Lit]
-findSat f = case runCDCL algorithmAction (initialState f) of
+findSat f = case runStateT algorithmAction (initialState f) of
     Right (ls, _) -> Just ls
     Left _ -> Nothing

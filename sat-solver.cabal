@@ -51,7 +51,7 @@ executable sat-solver
   main-is:             Main.hs
 
   -- Modules included in this executable, other than Main.
-  other-modules:       Propositional, FormulaState, CDCL, Algorithm
+  other-modules:       Propositional, FormulaState, Algorithm
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
@@ -59,7 +59,8 @@ executable sat-solver
   -- Other library packages from which modules are imported.
   build-depends:       base >=4.11 && <4.12,
                        containers >=0.6.2.1,
-                       cond >=0.4.1.1
+                       cond >=0.4.1.1,
+                       mtl >=2.2.1
 
   extensions: TypeSynonymInstances, FlexibleContexts
 
