@@ -23,9 +23,10 @@ main = do
     (vars, clauses, f) <- readInput
     let ret = findSat f
     case ret of
-        Just ls -> do
-            assert (satisfies ls f) $ return ()
-            putStrLn $ "s cnf 1 " ++ show vars ++ " " ++ show clauses
-            forM_ ls $ \l -> putStrLn $ "v " ++ show l
+        Just ls
+            | ls `satisfies` f -> do
+                putStrLn $ "s cnf 1 " ++ show vars ++ " " ++ show clauses
+                forM_ ls $ \l -> putStrLn $ "v " ++ show l
+            | otherwise -> putStrLn "c THE RESULT IS INCORRECT!!"
         Nothing -> do
             putStrLn $ "s cnf 0 " ++ show vars ++ " " ++ show clauses

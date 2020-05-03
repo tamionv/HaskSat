@@ -66,7 +66,7 @@ algorithmAction = do go ; gets choices where
 
     hasClauseOfSize x = gets $ any ((==x) . clauseSize) . headForm 
 
-    unitProp = modify unitPropagation
+    unitProp = do modify unitPropagation ; go
 
     failAndLearn = gets learnedClause >>= throwError
 

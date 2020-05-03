@@ -68,4 +68,3 @@ satisfies ls fs = isGood && all sat fs where
     s = S.fromList ls
     isGood = all (\l -> not $ (-l) `S.member` s) ls
     sat c = any (\l -> l `S.member` s) $ current c
-
