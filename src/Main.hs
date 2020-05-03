@@ -2,50 +2,11 @@ module Main where
 
 import Control.Monad
 import Control.Conditional (cond)
-import Debug.Trace
 import Propositional
-
-newtype CDCL a = CDCL (FormulaState -> Either (a, FormulaState) Clause)
-
-runCDCL :: CDCL a -> FormulaState -> Either (a, FormulaState) Clause
-runCDCL (CDCL f) = f
-
-evalCDCL :: CDCL a -> FormulaState -> a 
-evalCDCL c fs = case runCDCL c fs of Left (a, _) -> a
-
-liftStateFunc :: (FormulaState -> a) -> CDCL a
-liftStateFunc f = CDCL $ \fs -> Left (f fs, fs)
-
-getState :: CDCL FormulaState
-getState = liftStateFunc id
-
-instance Monad CDCL where
-    return x = CDCL $ \fs -> Left (x, fs)
-
-    xm >>= f = CDCL $ \fs -> case runCDCL xm fs of
-        Left (x, fs') -> runCDCL (f x) fs'
-        Right c -> Right c
-
-instance Functor CDCL where
-    fmap = liftM
-
-instance Applicative CDCL where
-    pure  = return
-    (<*>) = ap
-
-choose :: Lit -> Maybe [Lit] -> CDCL ()
-choose lit r = CDCL $ \fs -> Left ((), getChoiceResult lit r fs)
-
-orElse :: CDCL a -> CDCL a -> CDCL a
-xm `orElse` ym = CDCL $ \fs -> case runCDCL xm fs of
-    Left a -> Left a
-    Right c -> runCDCL ym $ threadIn c fs
-
-failAndLearn :: CDCL ()
-failAndLearn = CDCL $ \fs -> Right $ getLearnedClause fs
+import CDCL
 
 theAlgorithm :: CDCL [Lit]
-theAlgorithm = do go ; liftStateFunc getLiterals where
+theAlgorithm = do go ; liftReader getLiterals where
     go = do
         fs <- getState
         let cf = currentFormula fs
@@ -55,14 +16,20 @@ theAlgorithm = do go ; liftStateFunc getLiterals where
              , (otherwise       , tryLiteral)
              ]
 
+    choose lit r = modify $ getChoiceResult lit r
+
     unitProp = do
         cf <- currentFormula <$> getState
         let (c, _) = getUnitClause cf
         let (lit, r) = unitJustification c
         choose lit $ Just r
 
+    failAndLearn = do
+        c <- liftReader getLearnedClause
+        failWithClause c
+
     tryLiteral = do
-        lit <- liftStateFunc arbitraryLiteral
+        lit <- liftReader arbitraryLiteral
         choiceFor lit `orElse` choiceFor (-lit) 
 
     choiceFor lit = do choose lit Nothing ; go
@@ -85,8 +52,8 @@ main = do
     (vars, clauses, f) <- readInput
     let ret = runCDCL theAlgorithm (Initial f)
     case ret of
-        Left (ls, _) -> do
+        Right (ls, _) -> do
             putStrLn $ "s cnf 1 " ++ show vars ++ " " ++ show clauses
             forM_ ls $ \l -> putStrLn $ "v " ++ show l
-        Right _ -> do
+        Left _ -> do
             putStrLn $ "s cnf 0 " ++ show vars ++ " " ++ show clauses
