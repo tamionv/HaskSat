@@ -62,7 +62,7 @@ executable sat-solver
                        cond >=0.4.1.1,
                        mtl >=2.2.1
 
-  extensions: TypeSynonymInstances, FlexibleContexts
+  default-extensions: FlexibleContexts
 
   -- Directories containing source files.
   hs-source-dirs:      src

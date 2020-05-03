@@ -1,7 +1,7 @@
 module Algorithm (findSat) where
 
 import Control.Monad
-import Control.Conditional (cond)
+import Control.Conditional (condM, otherwiseM)
 import Control.Monad.State.Lazy
 import Control.Monad.Except
 import Propositional
@@ -30,11 +30,11 @@ learnedClause :: AlgState -> Clause
 learnedClause fs = go c fs where
     c = refreshClause $ head $ filter ((==0) . clauseSize ) $ headForm fs
     go c fs = case fs of
-        Initial _ -> c
         Derived _ _ Nothing fs' -> go c fs'
         Derived l _ (Just r) fs'
             | (-l) `inClause` c -> go (foldr addLiteral (removeLiteral (-l) c) r) fs'
             | otherwise -> go c fs'
+        _ -> c
 
 addClause :: Clause -> AlgState -> AlgState
 addClause c fs = fst $ go c fs where
@@ -43,32 +43,32 @@ addClause c fs = fst $ go c fs where
         (fs', c') = go c fs
         c'' = c' >>= setInClause l
         f' = case c'' of
-            Nothing -> f
             Just x -> x:f
+            _ -> f
 
 aLit :: AlgState -> Lit
 aLit = aClauseLit . minimumBy (comparing $ length . current) . headForm
 
 choices :: AlgState -> [Lit]
 choices fs = case fs of
-    Initial _ -> []
     Derived l _ _ fs' -> l:choices fs'
+    _ -> []
 
 algorithmAction :: StateT AlgState (Either Clause) [Lit]
 algorithmAction = do go ; gets choices where
-    go = do
-        f <- gets headForm
-        cond [ (null f                    , return ())
-             , (any ((==0) . clauseSize) f, failAndLearn)
-             , (any ((==1) . clauseSize) f, unitProp)
-             , (otherwise                 , tryLiteral)
-             ]
+    go = condM [ (isFinished       , return ())
+               , (hasClauseOfSize 0, failAndLearn)
+               , (hasClauseOfSize 1, unitProp)
+               , (otherwiseM       , tryLiteral)
+               ]
+
+    isFinished = gets $ null . headForm
+
+    hasClauseOfSize x = gets $ any ((==x) . clauseSize) . headForm 
 
     unitProp = modify unitPropagation
 
-    failAndLearn = do
-        c <- gets learnedClause
-        throwError c
+    failAndLearn = gets learnedClause >>= throwError
 
     tryLiteral = do
         lit <- gets aLit
@@ -79,6 +79,6 @@ algorithmAction = do go ; gets choices where
     choose lit = do modify $ derivedState lit Nothing ; go
 
 findSat :: Formula -> Maybe [Lit]
-findSat f = case runStateT algorithmAction (Initial f) of
-    Right (ls, _) -> Just ls
-    Left _ -> Nothing
+findSat f = case runStateT algorithmAction $ Initial f of
+    Right (x, _) -> Just x
+    _ -> Nothing
