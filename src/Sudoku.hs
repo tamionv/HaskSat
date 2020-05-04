@@ -2,6 +2,8 @@ module Main where
 
 import Control.Monad
 import Control.Exception
+import Debug.Trace
+import Data.List.Split
 import Data.Maybe
 import Propositional
 import Algorithm
@@ -11,55 +13,47 @@ type Sudoku = [[Maybe Int]]
 charToCell :: Char -> Maybe Int
 charToCell ch = case ch of
     '.' -> Nothing
-    _ -> Just $ read $ ch:[]
+    _ -> Just $ read $ [ch]
 
 readSudoku :: IO Sudoku
 readSudoku = forM [1..9] $ \_ -> do
     x <- getLine
     return $ map charToCell x
 
+var :: Int -> Int -> Int -> Int
 var i j k = 81 * (i - 1) + 9 * (j - 1) + (k - 1) + 1
 
-allPairs :: [a] -> [(a, a)]
-allPairs [] = []
-allPairs (x:xs) = map ((,) x) xs ++ allPairs xs
+pairs :: [a] -> [(a, a)]
+pairs xs = go xs [] where
+    go xs acc = case xs of
+        [] -> acc
+        x:xs -> go xs (map ((,) x) xs ++ acc)
 
 neighbours :: [((Int, Int), (Int, Int))]
-neighbours = vert ++ hor ++ box where
-    vertSet = [ [(i, j) | j <- [1..9]] | i <- [1..9]]
-    horSet = [ [(i, j) | i <- [1..9]] | j <- [1..9]]
-    boxSet = do
-        xs <- [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-        ys <- [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-        return $ do
-            x <- xs
-            y <- ys
-            return (x, y)
+neighbours = do
+    xSize <- [1, 3, 9]
+    let ySize = 9 `div` xSize
 
-    vert = concatMap allPairs vertSet
-    hor = concatMap allPairs horSet
-    box = concatMap allPairs boxSet
+    xs <- chunksOf xSize [1..9]
+    ys <- chunksOf ySize [1..9]
+
+    pairs [(x, y) | x <- xs, y <- ys]
 
 baseFormula :: Formula
-baseFormula = requirements ++ concatMap f neighbours where
-    f ((i, j), (i', j')) = [ buildClause [ -var i j x, - var i' j' x ]
-                           | x <- [1..9]
-                           ]
-    requirements = [ buildClause [ var i j k | k <- [1..9] ] | i <- [1..9], j <- [1..9] ]
+baseFormula = requirements ++ concatMap exclusionClause neighbours where
+    exclusionClause ((i, j), (i', j')) =
+        [ buildClause [ -var i j k, -var i' j' k ] | k <- [1..9] ]
+    requirements =
+        [ buildClause [ var i j k | k <- [1..9] ] | i <- [1..9], j <- [1..9] ]
 
 getFormula :: Sudoku -> Formula
 getFormula s = baseFormula ++ extra where
-    indexed = zipWith zip [ [(i, j) | j <- [1..9]] | i <- [1..9]] s
-    together = concat indexed
+    extra = catMaybes $ zipWith clauseFor indices $ concat s
+    indices = [ (i, j) | i <- [1..9], j <- [1..9] ]
+    clauseFor i j = fmap $ var i j
 
-    indexedToFormula x = case x of
-        ((i, j), Just y) -> Just $ buildClause [var i j y]
-        _ -> Nothing
-
-    extra = mapMaybe indexedToFormula together
-
-interpretSudoku :: [Lit] -> [String]
-interpretSudoku ls = do
+interpretAssignment :: [Lit] -> [String]
+interpretAssignment ls = do
     i <- [1..9]
     return $ do
         j <- [1..9]
@@ -68,5 +62,5 @@ interpretSudoku ls = do
 main = do
     s <- readSudoku
     let Just assign = findSat $ getFormula s
-    let s = interpretSudoku assign
+    let s = interpretAssignment assign
     forM s putStrLn

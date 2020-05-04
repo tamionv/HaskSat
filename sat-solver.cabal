@@ -84,7 +84,8 @@ executable sudoku
   build-depends:       base >=4.11 && <4.12,
                        containers >=0.6.2.1,
                        cond >=0.4.1.1,
-                       mtl >=2.2.1
+                       mtl >=2.2.1,
+                       split >=0.2.3
 
   default-extensions: FlexibleContexts
 
