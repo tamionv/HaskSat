@@ -5,8 +5,8 @@ import Control.Exception
 import Debug.Trace
 import Data.List.Split
 import Data.Maybe
-import Propositional
-import Algorithm
+import Sat.Propositional
+import Sat.Algorithm
 
 type Sudoku = [Maybe Int]
 

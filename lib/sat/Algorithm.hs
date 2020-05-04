@@ -1,10 +1,10 @@
-module Algorithm (findSat) where
+module Sat.Algorithm (findSat) where
 
 import Control.Monad
 import Control.Conditional (condM, otherwiseM)
 import Control.Monad.State.Lazy
 import Control.Monad.Except
-import Propositional
+import Sat.Propositional
 import Data.List
 import Data.Ord
 

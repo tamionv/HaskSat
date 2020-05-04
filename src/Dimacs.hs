@@ -2,8 +2,8 @@ module Main where
 
 import Control.Monad
 import Control.Exception
-import Propositional
-import Algorithm
+import Sat.Propositional
+import Sat.Algorithm
 
 readInput :: IO (Int, Int, Formula)
 readInput = do

@@ -1,19 +1,20 @@
-module Propositional ( Var
-                     , Lit
-                     , Clause(..)
-                     , Formula
-                     , buildClause
-                     , refreshClause
-                     , aClauseLit
-                     , clauseSize
-                     , addLiteral
-                     , inClause
-                     , removeLiteral
-                     , setInClause
-                     , setInFormula
-                     , tautology
-                     , satisfies
-                     ) where
+module Sat.Propositional
+    ( Var
+    , Lit
+    , Clause(..)
+    , Formula
+    , buildClause
+    , refreshClause
+    , aClauseLit
+    , clauseSize
+    , addLiteral
+    , inClause
+    , removeLiteral
+    , setInClause
+    , setInFormula
+    , tautology
+    , satisfies
+    ) where
 
 import qualified Data.Set as S
 import Data.Maybe
