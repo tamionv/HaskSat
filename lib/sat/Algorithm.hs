@@ -1,9 +1,12 @@
 module Sat.Algorithm (findSat) where
 
 import Control.Monad
+import System.Random
+import Control.Monad.Random.Strict
 import Control.Conditional (condM, otherwiseM)
-import Control.Monad.State.Lazy
+import Control.Monad.State.Strict
 import Control.Monad.Except
+import Control.Monad.Identity
 import Sat.Propositional
 import Data.List
 import Data.Ord
@@ -58,18 +61,19 @@ addClause c fs = fst $ go c fs where
                 Just x -> x:headForm fs'
                 _ -> f
 
-aLit :: AlgState -> Lit
-aLit = aClauseLit . maximumBy (comparing clauseSize) . headForm
+candidates :: AlgState -> [Lit]
+candidates fs = [ aClauseLit $ maximumBy (comparing clauseSize) $ headForm fs
+                , negate $ aClauseLit $ minimumBy (comparing clauseSize) $ headForm fs
+                ]
 
 choices :: AlgState -> [Lit]
 choices fs = case fs of
     Derived { decision=l, previousState=fs' } -> l:choices fs'
     _ -> []
 
-algorithmAction :: StateT AlgState (Either [Clause]) [Lit]
+algorithmAction :: StateT AlgState (ExceptT [Clause] (Rand StdGen)) [Lit]
 algorithmAction = do go ; gets choices where
-    go = do
-        condM [ (isFinished       , return ())
+    go = condM [ (isFinished       , return ())
               , (hasClauseOfSize 0, failAndLearn)
               , (hasClauseOfSize 1, unitProp)
               , (otherwiseM       , tryLiteral)
@@ -84,14 +88,14 @@ algorithmAction = do go ; gets choices where
     failAndLearn = gets learnedClauses >>= throwError
 
     tryLiteral = do
-        lit <- gets aLit
-        catchError (choose lit) $ mapM_ $ \c -> do
+        lit <- get >>= (lift <$> lift <$> uniform <$> candidates)
+        catchError (choose $ -lit) $ mapM_ $ \c -> do
             when (not $ tautology c) $ modify' $ addClause c
-            choose $ -lit
+            choose $ lit
 
     choose lit = do modify' $ derivedState lit Nothing ; go
 
 findSat :: Formula -> Maybe [Lit]
-findSat f = case runStateT algorithmAction $ initialState f of
+findSat f = case flip evalRand (mkStdGen 1352) $ runExceptT $ runStateT algorithmAction $ initialState f of
     Right (x, _) -> Just x
     _ -> Nothing

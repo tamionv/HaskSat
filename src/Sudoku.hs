@@ -29,22 +29,26 @@ pairs xs = go xs [] where
         [] -> acc
         x:xs -> go xs (map ((,) x) xs ++ acc)
 
-neighbours :: [((Int, Int), (Int, Int))]
-neighbours = do
+neighbourhoods :: [[(Int, Int)]]
+neighbourhoods = do
     xSize <- [1, 3, 9]
     let ySize = 9 `div` xSize
-
     xs <- chunksOf xSize [1..9]
     ys <- chunksOf ySize [1..9]
 
-    pairs [(x, y) | x <- xs, y <- ys]
+    return [(x, y) | x <- xs, y <- ys]
+
+
+neighbours :: [((Int, Int), (Int, Int))]
+neighbours = concatMap pairs neighbourhoods
 
 baseFormula :: Formula
 baseFormula = requirements ++ concatMap exclusionClause neighbours where
     exclusionClause ((i, j), (i', j')) =
         [ fromList [ -var i j k, -var i' j' k ] | k <- [1..9] ]
     requirements =
-        [ fromList [ var i j k | k <- [1..9] ] | i <- [1..9], j <- [1..9] ]
+        [ fromList [ var i j k | k <- [1..9] ] | i <- [1..9], j <- [1..9] ] ++
+        [ fromList [ var i j k | k <- [1..9], (i, j) <- hood ] | hood <- neighbourhoods ]
 
 getFormula :: Sudoku -> Formula
 getFormula s = baseFormula ++ extra where

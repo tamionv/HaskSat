@@ -50,7 +50,9 @@ library sat-solver
   build-depends:       base >=4.11 && <4.12,
                        containers >=0.6.2.1,
                        cond >=0.4.1.1,
-                       mtl >=2.2.1
+                       mtl >=2.2.1,
+                       MonadRandom >=0.5.1.2,
+                       random >=1.1
   hs-source-dirs:      lib
   default-extensions:  FlexibleContexts
   default-language:    Haskell2010
