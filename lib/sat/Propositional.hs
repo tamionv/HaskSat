@@ -4,7 +4,6 @@ module Sat.Propositional
     , Clause(..)
     , Formula
     , buildClause
-    , refreshClause
     , aClauseLit
     , clauseSize
     , addLiteral
@@ -14,24 +13,28 @@ module Sat.Propositional
     , setInFormula
     , tautology
     , satisfies
+    , fromList
     ) where
 
-import qualified Data.Set as S
+import qualified Data.IntSet as S
 import Data.Maybe
 
 type Var = Int
 
 type Lit = Int
 
-data Clause = Clause { initial :: [Lit]
-                     , current :: S.Set Lit
+data Clause = Clause { initial :: S.IntSet
+                     , current :: S.IntSet 
                      } deriving (Show, Eq, Ord)
 
 type Formula = [Clause]
 
-buildClause :: [Lit] -> Clause
+fromList :: [Lit] -> Clause
+fromList = buildClause . S.fromList
+
+buildClause :: S.IntSet -> Clause
 buildClause ls = Clause { initial = ls
-                         , current = S.fromList ls
+                         , current = ls
                          }
 
 aClauseLit :: Clause -> Lit
@@ -40,16 +43,13 @@ aClauseLit = S.findMin . current
 clauseSize :: Clause -> Int
 clauseSize = S.size . current
 
-refreshClause :: Clause -> Clause
-refreshClause = buildClause . initial
-
 addLiteral :: Lit -> Clause -> Clause
-addLiteral l c = Clause { initial = l:initial c
+addLiteral l c = Clause { initial = S.insert l $ initial c
                         , current = S.insert l $ current c
                         }
 
 tautology :: Clause -> Bool
-tautology c = any (`inClause` c) $ map negate $ initial c
+tautology c = any (`inClause` c) $ map negate $ S.toList $ current c
 
 inClause :: Lit -> Clause -> Bool
 inClause l c = l `S.member` current c
@@ -70,4 +70,4 @@ satisfies :: [Lit] -> Formula -> Bool
 satisfies ls fs = isGood && all sat fs where
     s = S.fromList ls
     isGood = all (\l -> not $ (-l) `S.member` s) ls
-    sat c = any (\l -> l `S.member` s) $ current c
+    sat c = any (\l -> l `S.member` s) $ S.toList $ current c

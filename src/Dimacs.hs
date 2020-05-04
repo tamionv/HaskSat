@@ -16,7 +16,7 @@ readInput = do
             a <- sequence $ take nr $ repeat $ do
                 x <- getLine
                 let xs = (map read $ init $ words x) :: [Int]
-                return $ buildClause xs
+                return $ fromList xs
             return (vars, nr, a)
 
 main = do

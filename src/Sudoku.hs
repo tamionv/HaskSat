@@ -21,7 +21,7 @@ readSudoku = do
     return $ map charToCell x
 
 var :: Int -> Int -> Int -> Int
-var i j k = 81 * (i - 1) + 9 * (j - 1) + (k - 1) + 1
+var j k i = -(81 * (i - 1) + 9 * (j - 1) + (k - 1) + 1)
 
 pairs :: [a] -> [(a, a)]
 pairs xs = go xs [] where
@@ -42,15 +42,15 @@ neighbours = do
 baseFormula :: Formula
 baseFormula = requirements ++ concatMap exclusionClause neighbours where
     exclusionClause ((i, j), (i', j')) =
-        [ buildClause [ -var i j k, -var i' j' k ] | k <- [1..9] ]
+        [ fromList [ -var i j k, -var i' j' k ] | k <- [1..9] ]
     requirements =
-        [ buildClause [ var i j k | k <- [1..9] ] | i <- [1..9], j <- [1..9] ]
+        [ fromList [ var i j k | k <- [1..9] ] | i <- [1..9], j <- [1..9] ]
 
 getFormula :: Sudoku -> Formula
 getFormula s = baseFormula ++ extra where
     extra = catMaybes $ zipWith clauseFor indices s
     indices = [ (i, j) | i <- [1..9], j <- [1..9] ]
-    clauseFor (i, j) = fmap $ \k -> buildClause [var i j k]
+    clauseFor (i, j) = fmap $ \k -> fromList [var i j k]
 
 interpretAssignment :: [Lit] -> [String]
 interpretAssignment ls = do
