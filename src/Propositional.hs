@@ -11,6 +11,7 @@ module Propositional ( Var
                      , removeLiteral
                      , setInClause
                      , setInFormula
+                     , tautology
                      , satisfies
                      ) where
 
@@ -42,11 +43,12 @@ refreshClause :: Clause -> Clause
 refreshClause = buildClause . initial
 
 addLiteral :: Lit -> Clause -> Clause
-addLiteral l c
-    | (-l) `inClause` c = buildClause []
-    | otherwise = Clause { initial = l:initial c
-                         , current = S.insert l $ current c
-                         }
+addLiteral l c = Clause { initial = l:initial c
+                        , current = S.insert l $ current c
+                        }
+
+tautology :: Clause -> Bool
+tautology c = any (`inClause` c) $ map negate $ initial c
 
 inClause :: Lit -> Clause -> Bool
 inClause l c = l `S.member` current c

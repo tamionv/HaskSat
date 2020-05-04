@@ -73,8 +73,8 @@ algorithmAction = do go ; gets choices where
     tryLiteral = do
         lit <- gets aLit
         choose lit `catchError` \c -> do
-            modify $ addClause c
-            choose (-lit) 
+            when (not $ tautology c) $ modify $ addClause c
+            choose $ -lit
 
     choose lit = do modify $ derivedState lit Nothing ; go
 

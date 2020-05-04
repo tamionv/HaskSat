@@ -8,7 +8,7 @@ import Data.Maybe
 import Propositional
 import Algorithm
 
-type Sudoku = [[Maybe Int]]
+type Sudoku = [Maybe Int]
 
 charToCell :: Char -> Maybe Int
 charToCell ch = case ch of
@@ -16,7 +16,7 @@ charToCell ch = case ch of
     _ -> Just $ read $ [ch]
 
 readSudoku :: IO Sudoku
-readSudoku = forM [1..9] $ \_ -> do
+readSudoku = do
     x <- getLine
     return $ map charToCell x
 
@@ -48,9 +48,9 @@ baseFormula = requirements ++ concatMap exclusionClause neighbours where
 
 getFormula :: Sudoku -> Formula
 getFormula s = baseFormula ++ extra where
-    extra = catMaybes $ zipWith clauseFor indices $ concat s
+    extra = catMaybes $ zipWith clauseFor indices s
     indices = [ (i, j) | i <- [1..9], j <- [1..9] ]
-    clauseFor i j = fmap $ var i j
+    clauseFor (i, j) = fmap $ \k -> buildClause [var i j k]
 
 interpretAssignment :: [Lit] -> [String]
 interpretAssignment ls = do
