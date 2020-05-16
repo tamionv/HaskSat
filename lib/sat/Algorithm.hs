@@ -2,7 +2,8 @@ module Sat.Algorithm (findSat) where
 
 import Control.Monad
 import Control.Conditional (condM, otherwiseM)
-import Control.Monad.State.Lazy
+import Control.Monad.State.Strict
+import Control.Monad.Identity
 import Control.Monad.Except
 import Sat.Propositional
 import Data.List
@@ -66,7 +67,7 @@ choices fs = case fs of
     Derived { decision=l, previousState=fs' } -> l:choices fs'
     _ -> []
 
-algorithmAction :: StateT AlgState (Either [Clause]) [Lit]
+algorithmAction :: StateT AlgState (ExceptT [Clause] Identity) [Lit]
 algorithmAction = do go ; gets choices where
     go = do
         condM [ (isFinished       , return ())
@@ -92,6 +93,6 @@ algorithmAction = do go ; gets choices where
     choose lit = do modify' $ derivedState lit Nothing ; go
 
 findSat :: Formula -> Maybe [Lit]
-findSat f = case runStateT algorithmAction $ initialState f of
+findSat f = case runIdentity $ runExceptT $ runStateT algorithmAction $ initialState f of
     Right (x, _) -> Just x
     _ -> Nothing
