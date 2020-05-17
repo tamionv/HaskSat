@@ -51,9 +51,9 @@ library sat-solver
                        containers >=0.6.2.1,
                        cond >=0.4.1.1,
                        mtl >=2.2.1
-  ghc-options:         -O2 -optc-O3 -funfolding-use-threshold=16
+  ghc-options:         -O2 -optc-O3 -funfolding-use-threshold=16 -threaded
   hs-source-dirs:      lib
-  default-extensions:  FlexibleContexts, BangPatterns
+  default-extensions:  FlexibleContexts, BangPatterns, FlexibleInstances, MultiParamTypeClasses
   default-language:    Haskell2010
 
 executable dimacs

@@ -67,8 +67,29 @@ choices fs = case fs of
     Derived { decision=l, previousState=fs' } -> l:choices fs'
     _ -> []
 
-algorithmAction :: StateT AlgState (ExceptT [Clause] Identity) [Lit]
-algorithmAction = do go ; gets choices where
+newtype CSEM s e a x = CSEM { runCSEM :: (x -> s -> a) -> (e -> s -> a) -> s -> a }
+
+instance Monad (CSEM s e a) where
+    return x = CSEM $! \ks _ s -> ks x s
+    xm >>= f = CSEM $! \ks ke s -> runCSEM xm (\x s -> runCSEM (f x) ks ke s) ke s
+
+instance MonadError e (CSEM s e a) where
+    throwError e = CSEM $! \_ ke s -> ke e s
+    xm `catchError` f = CSEM $! \ks ke s -> runCSEM xm ks (\x _ -> runCSEM (f x) ks ke s) s
+
+instance MonadState s (CSEM s e a) where
+    get = CSEM $! \ks _ s -> ks s s
+    put s = CSEM $! \ks _ _ -> ks () s
+
+instance Functor (CSEM s e a) where
+    fmap = liftM
+
+instance Applicative (CSEM s e a) where
+    pure = return
+    (<*>) = ap
+
+findSat :: Formula -> Maybe [Lit]
+findSat f = runCSEM go (\_ x -> Just (choices x)) (\_ _ -> Nothing) (initialState f) where
     go = do
         condM [ (isFinished       , return ())
               , (hasClauseOfSize 0, failAndLearn)
@@ -92,8 +113,3 @@ algorithmAction = do go ; gets choices where
             choose $ -lit
 
     choose lit = do modify' $! derivedState lit Nothing ; go
-
-findSat :: Formula -> Maybe [Lit]
-findSat f = case runIdentity $! runExceptT $! runStateT algorithmAction $! initialState f of
-    Right (x, _) -> Just x
-    _ -> Nothing
