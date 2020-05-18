@@ -5,7 +5,6 @@ import Control.Exception
 import Debug.Trace
 import Data.List.Split
 import Data.Maybe
-import Sat.Propositional
 import Sat.Algorithm
 
 type Sudoku = [Maybe Int]
@@ -42,15 +41,15 @@ neighbours = do
 baseFormula :: Formula
 baseFormula = requirements ++ concatMap exclusionClause neighbours where
     exclusionClause ((i, j), (i', j')) =
-        [ fromList [ -var i j k, -var i' j' k ] | k <- [1..9] ]
+        [ [ -var i j k, -var i' j' k ] | k <- [1..9] ]
     requirements =
-        [ fromList [ var i j k | k <- [1..9] ] | i <- [1..9], j <- [1..9] ]
+        [ [ var i j k | k <- [1..9] ] | i <- [1..9], j <- [1..9] ]
 
 getFormula :: Sudoku -> Formula
 getFormula s = baseFormula ++ extra where
     extra = catMaybes $ zipWith clauseFor indices s
     indices = [ (i, j) | i <- [1..9], j <- [1..9] ]
-    clauseFor (i, j) = fmap $ \k -> fromList [var i j k]
+    clauseFor (i, j) = fmap $ \k -> [var i j k]
 
 interpretAssignment :: [Lit] -> [String]
 interpretAssignment ls = do
