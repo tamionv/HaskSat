@@ -6,7 +6,7 @@ module Sat.Algorithm ( findSat
 
 import Control.Monad
 import Control.Applicative
--- import Control.Conditional
+import Control.Conditional (ifM)
 import Control.Monad.State
 import Data.List
 import Data.Ord
@@ -30,28 +30,21 @@ type Assignment = M.IntMap Maplet
 
 type AlgState = (Formula, Assignment)
 
-newtype AlgMonad x = AlgMonad { runMonad :: AlgState -> (Formula, Maybe (Assignment, x)) }
+newtype AlgMonad x = AlgMonad { runMonad :: forall r. AlgState -> (AlgState -> x -> r) -> (Formula -> r) -> r }
 
 instance Monad AlgMonad where
-    return x = AlgMonad $ \(f, a) -> (f, Just (a, x))
-
-    xm >>= f = AlgMonad $ \s ->
-        let (f', v) = runMonad xm s
-        in case v of
-            Just (a', x) -> runMonad (f x) (f', a')
-            Nothing -> (f', Nothing)
+    return x = AlgMonad $ \(!s) k kf -> k s x
+    xm >>= f = AlgMonad $ \(!s@(_, a)) k kf -> runMonad xm s (\(!s') (!x) -> runMonad (f x) s' k kf) kf
 
 instance MonadPlus AlgMonad where
-    mzero = AlgMonad $ \(f, a) -> (f, Nothing)
-    xm `mplus` ym = AlgMonad $ \s@(_, a) ->
-        let (f', v) = runMonad xm s
-        in case v of
-            Just (a', x) -> (f', Just (a', x))
-            Nothing -> runMonad ym (f', a)
+    mzero = AlgMonad $ \((!f), _) _ kf -> kf f
+
+    xm `mplus` ym = AlgMonad $ \(!s@(_, a)) k kf ->
+        runMonad xm s k (\(!f') -> runMonad ym (f', a) k kf)
 
 instance MonadState AlgState AlgMonad where
-    get = AlgMonad $ \s@(f, a) -> (f, Just (a, s))
-    put (f, a) = AlgMonad $ \_ -> (f, Just (a, ()))
+    get = AlgMonad $ \(!s) k kf -> k s s
+    put s = AlgMonad $ \_ k kf -> k s ()
 
 instance Functor AlgMonad where
     fmap = liftM
@@ -118,6 +111,7 @@ chooseLit (!f, !a) = head
 
 learnedClauses :: AlgState -> [Clause]
 learnedClauses (!f, !a) = map getConflict
+                        $ take 1
                         $ filter ((==Just[]) . clauseAfterAssignment a) f where
     getConflict [] = []
     getConflict (c:cs) = case M.lookup (varOfLit c) a >>= reason of
@@ -154,9 +148,7 @@ algorithmAction = go where
 
     choose lit = do modify' $ \(f, a) -> (f, addMaplet lit Nothing a) ; go
 
-    exhaust lit = choose lit `mplus` choose (-lit)
+    exhaust lit = choose lit `mplus` ifM (gets $ not . unsatisfied) (choose (-lit)) mzero
 
 findSat :: Formula -> Maybe [Lit]
-findSat f = case runMonad algorithmAction $ (f, M.empty) of
-    (_, Just (_, x)) -> Just x
-    _ -> Nothing
+findSat f = runMonad algorithmAction (f, M.empty) (\_ x -> Just x) (\_ -> Nothing)
